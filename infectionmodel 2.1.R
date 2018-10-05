@@ -1,13 +1,19 @@
+##changelog
+##2.2 Added Bayesian flip function
 ## ---- modelfunctions ----
 
 runmodel<-function(params,ageburn=2000){
   with(params,{    
     #starting population
-    pop<-data.frame(age=abs(rnorm(n0,0,40)),strategy=startingstrategy,infected=0,immune=0,previousinfections=0,PIsum=0,PIweighted=0,dieinfect=0,dieage=0,die=0,reprod=0,RS=0,R0=0,RR=0)
-
+    pop<-data.frame(age=abs(rnorm(n0,0,40)),strategy=startingstrategy,infected=0,immune=0,previousinfections=0,PIsum=0,PIweighted=0,PNIweighted=0,dieinfect=0,dieage=0,die=0,reprod=0,RS=0,R0=0,RR=0)
+    #baseline immune history for uninfected population
+    pop$PNIweighted<-sapply(pop$age,function(x) sum(PIdecline^(seq(1,x*12+priorMon))))
     #burn in age structure
     for(i in 1:ageburn){
       pop$age<-pop$age+(1/12)
+      pop$PNIweighted<-pop$PNIweighted*PIdecline
+      pop$PNIweighted[pop$PNIweighted<1]<-0
+      pop$PNIweighted<-pop$PNIweighted+1
       #count time since last reprod, know if eligible to reproduce again
       pop$reprod[pop$reprod>=1]<-pop$reprod[pop$reprod>=1]+1
       pop$reprod[pop$reprod>9]<-0
@@ -15,7 +21,7 @@ runmodel<-function(params,ageburn=2000){
       pop$reprod[pop$reprod==0 & pop$age>=18 & pop$age<=45] <- rbinom(length(pop$reprod[pop$reprod==0 & pop$age>=18 & pop$age<=45]),1,reprodrate)
       pop$RS[pop$reprod==1]<-pop$RS[pop$reprod==1]+1
       if(sum(pop$reprod==1)>0){
-        babies<-data.frame(age=rep(0,sum(pop$reprod==1)),strategy=startingstrategy,infected=0,immune=0,previousinfections=0,PIsum=0,PIweighted=0,dieinfect=0,dieage=0,die=0,reprod=0,RS=0,R0=0,RR=0)
+        babies<-data.frame(age=rep(0,sum(pop$reprod==1)),strategy=startingstrategy,infected=0,immune=0,previousinfections=0,PIsum=0,PIweighted=0,PNIweighted=priorMon,dieinfect=0,dieage=0,die=0,reprod=0,RS=0,R0=0,RR=0)
         #baby gets mom's strategy perfectly for this start, just in case I mix them later and don't want proportion to change with reproduction
         babies$strategy<-pop$strategy[pop$reprod==1]
         pop<-rbind(pop,babies)
@@ -44,6 +50,8 @@ runmodel<-function(params,ageburn=2000){
       #age
       pop$age<-pop$age+(1/12)
       #cumulative past history gets downweighted each round, by same decline as loss of tolerance
+      pop$PNIweighted<-pop$PNIweighted*PIdecline
+      pop$PNIweighted[pop$PNIweighted<1]<-0
       pop$PIweighted<-pop$PIweighted*PIdecline
       pop$PIweighted[pop$PIweighted<1]<-0
       
@@ -52,8 +60,25 @@ runmodel<-function(params,ageburn=2000){
       pop$strategy[pop$infected==0 & pop$PIweighted==0]<-1
       
       #check for strategy switching, can only switch if infected (do this after infection so infants can switch right after infected)
-      flipprob<-1/(1 + exp(-(((pop$infected[pop$infected>0]+pop$PIweighted[pop$infected>0])*flip-(pop$age[pop$infected>0]*12+9))/(pop$age[pop$infected>0]*12+9))*log(0.999/0.001)))
-      if(noflip) flipprob<-0
+      # define grid
+      p_grid <- seq( from=0 , to=1 , length.out=100 )
+      uniprior <- rep( 1 , 100 )
+      #posterior is based on weighted months infected x a multiplier (since months infected should update prior more than unifected), and weighted months uninfected. Weighting is to simulate gradual decline in immunological memory
+      #posterior is the liklihood that an infection is endemic and cannot or should not be resisted
+      
+      if(noflip) flipprob<-0 
+      else flipprob <- apply(pop[pop$infected>0,c("infected","PIweighted","PNIweighted")],1,function(pp){
+          infmonths<-round(pp[1]+pp[2])*infectionweight
+          notinfmonths<-round(pp[3])
+          likelihood <-dbinom( infmonths , size=(infmonths+notinfmonths), prob=p_grid )
+          # compute product of likelihood and prior
+          unstd.posterior <- likelihood * uniprior
+          # standardize the posterior, so it sums to 1
+          posterior <- unstd.posterior / sum(unstd.posterior)
+          #sample from the posterior and see if it is > the set threshold for flipping
+          sample(p_grid,1,prob=posterior)
+      })
+          
       tolerate<-rbinom(length(pop$infected[pop$infected>0]),1,flipprob)
       pop$strategy[pop$infected>0][tolerate==1]<-2
       
@@ -86,7 +111,8 @@ runmodel<-function(params,ageburn=2000){
       
       #if still infected, mark infection duration for longer
       pop$infected[pop$infected>0] <- pop$infected[pop$infected>0]+1
-      
+      #if not infected add to counter of uninfected time
+      pop$PNIweighted[pop$infected==0]<-pop$PNIweighted+1
 
       #infection spreads
       if(sum(pop$infected>0)>0){
@@ -114,7 +140,7 @@ runmodel<-function(params,ageburn=2000){
       pop$RS[pop$reprod==1]<-pop$RS[pop$reprod==1]+1
       #baby has chance of getting mom's strategy if mom is infected
       if(sum(pop$reprod==1)>0){
-        babies<-data.frame(age=rep(0,sum(pop$reprod==1)),strategy=startingstrategy,infected=0,immune=0,previousinfections=0,PIsum=0,PIweighted=0,dieinfect=0,dieage=0,die=0,reprod=0,RS=0,R0=0,RR=0)
+        babies<-data.frame(age=rep(0,sum(pop$reprod==1)),strategy=startingstrategy,infected=0,immune=0,previousinfections=0,PIsum=0,PIweighted=0,PNIweighted=priorMon,dieinfect=0,dieage=0,die=0,reprod=0,RS=0,R0=0,RR=0)
         
         #baby gets immunity if mom is infected with Pim and history with weight h2epi
         babies$immune<-rbinom(length(babies$immune),1,Pim*h2inf)*(pop$infected[pop$reprod==1]>0)
