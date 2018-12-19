@@ -1,9 +1,9 @@
 library(wesanderson)
-cols<-c("black",wes_palette("Darjeeling")[c(3,2,1,4,5)])
+cols<-c("black",wes_palette("Darjeeling1")[c(3,2,1,4,5)])
 
 ## ---- modelflu ----
 #set for flu. Medium cost immunity, same cost tolerance, high chance clearing, immunity
-paramsflu<-list(n0=1000,
+paramsflu<-list(n0=1000, 
                 months=120,
                 h2inf=1,
                 h2past=0.1,
@@ -17,17 +17,24 @@ paramsflu<-list(n0=1000,
                 Pcr=0.8,
                 Pct=0,
                 Pim=0.90,
-                flip=1,
                 PIdecline=0.98,
-                inheritstrategy=FALSE)
+                dieexp=0.0015,
+                priorMon=12,
+                infectionweight=2,
+                treat=NA,
+                treatefficacy=0,
+                inheritstrategy=FALSE,
+                noflip=FALSE)
 #seed is just to produce a consistent graph each time. Randomizing the seed will produce similar, but not 100% identical results.
-set.seed(65628)
+
+
+set.seed(2367)
 popsflu<-runmodel(paramsflu)
 #tiff("flufig.tif",width=2000,height=1000,res=400,compression="lzw",pointsize=8)
-pdf("figures/flufig.pdf",width=3.43, height=1.7,pointsize=6)
+#pdf("figures/flufig.pdf",width=3.43, height=1.7,pointsize=6)
 
 library(wesanderson)
-cols<-c("black",wes_palette("Darjeeling")[c(3,2,1,4,5)])
+cols<-c("black",wes_palette("Darjeeling1")[c(3,2,1,4,5)])
 n<-12
 pops<-popsflu$pops[1:n]
 infections<-popsflu$infections

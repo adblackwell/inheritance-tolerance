@@ -1,10 +1,11 @@
-load(file="allpops4.2")
+load(file="allpops4.3")
 library(wesanderson)
-cols<-c("black",wes_palette("Darjeeling")[c(3,2,1,4,5)])
+cols<-c("black",wes_palette("Darjeeling1")[c(3,2,1,4,5)])
 pdf("figures/immunefig.pdf",width=7, height=4,pointsize=12)
 strategyreport4(allpops[1:3],n=50*12,cols=cols,popmax=2000)
 dev.off()
-
+strategyreport4(allpops[c(1,3,4)],n=50*12,cols=cols,popmax=2000)
+strategyreport4(allpops[c(5,6,7)],n=50*12,cols=cols,popmax=2000)
 strategyreport4(allpops2,n=100*12,cols=cols,popmax=4000)
 
 tiff("zoomfig.tif",width=1000,height=1000,res=400,compression="lzw",pointsize=8)

@@ -67,8 +67,9 @@ unstd.posterior <- likelihood * prior
 posterior <- unstd.posterior / sum(unstd.posterior)
 plot( p_grid , posterior , type="b" , xlab="probability of water" , ylab="posterior probability" )
 
-
-pop<-data.frame(infected=0:8,PIweighted=0,PNIweighted=8*0.98^(0:8))
+p_grid <- seq( from=0 , to=1 , length.out=100 )
+uniprior <- rep( 1 , 100 )
+pop<-data.frame(infected=0:8,PIweighted=0,PNIweighted=12*0.98^(0:8))
 infectionweight<-3
 flipprob <- apply(pop[,c("infected","PIweighted","PNIweighted")],1,function(pp){
   infmonths<-round(pp[1]+pp[2])*infectionweight
@@ -79,8 +80,12 @@ flipprob <- apply(pop[,c("infected","PIweighted","PNIweighted")],1,function(pp){
   # standardize the posterior, so it sums to 1
   posterior <- unstd.posterior / sum(unstd.posterior)
   #sample from the posterior and see if it is > the set threshold for flipping
-  #sample(p_grid,1,prob=posterior)
+  post<-sample(p_grid,1000,prob=posterior,replace=TRUE)
+  sum(post>=0.5)/1000
 })
 
+plot(1:9,flipprob)
+abline(h=9)
+
 par(mfrow=c(3,3))
-for(i in 1:9) plot( p_grid , flipprob[,i] , type="b" , xlab="probability of flipping" , ylab="posterior probability" )
+for(i in 1:9) plot( p_grid , flipprob[i] , type="b" , xlab="probability of flipping" , ylab="posterior probability" )
