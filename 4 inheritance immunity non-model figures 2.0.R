@@ -73,7 +73,7 @@ dev.off()
 load("optimalstrategies2")
 
 library(wesanderson)
-colp<-colorRampPalette(c("white",wes_palette("Darjeeling"))[c(3,1,5)])
+colp<-colorRampPalette(c("white",wes_palette("Darjeeling1"))[c(3,1,5)])
 #colp<-colorRampPalette(wes_palette("Darjeeling")[c(3,5)])
 immunity<-seq(0,1,0.05)
 reinf<-seq(0,1,0.025)

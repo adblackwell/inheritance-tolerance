@@ -38,9 +38,13 @@ Models can be run by using...
 ### A long-lived infection
 
 
+##Placental immunization
+
+
+
 ## Additional examples
 
-### Difficult to clear, low mortality
+### Difficult to clear, low mortality, helminth model
 
 ## Including Plots
 
