@@ -1,10 +1,10 @@
-#Models for publication. 
+#Run for a flu-like model (Figure 5)
 library(doParallel)
 library(parallel)
 library(foreach)
 
 #Load functions first
-source("1 Model Functions 3.0.R")
+source("1 Model Functions.R")
 
 #color palette to use for figures.
 library(wesanderson)

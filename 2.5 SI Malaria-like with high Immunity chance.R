@@ -1,10 +1,10 @@
-#Models for publication. 
+#Malaria-like model but with high chance of immunity. (Figures S5 & S6)
 library(doParallel)
 library(parallel)
 library(foreach)
 
 #Load functions first
-source("1 Model Functions 3.0.R")
+source("1 Model Functions.R")
 
 #color palette to use for figures.
 library(wesanderson)
@@ -12,10 +12,10 @@ cols<-c("black",wes_palette("Darjeeling1")[c(3,2,1,4,5)])
 
 #primary comparison
 
-params1<-makeparams(h2current=0,h2past=0,Pim=0.05,infectedT0=0,Pmr=0,Pmt=0) #Base with no infection
-params2<-makeparams(h2current=0,h2past=0,Pim=0.05,noflip=TRUE) #No Tolerance
-params3<-makeparams(h2current=0,h2past=0,Pim=0.05) #Tolerance but no inheritance
-params4<-makeparams(h2current=1,h2past=0.1,Pim=0.05) #Tolerance and inheritance
+params1<-makeparams(h2current=0,h2past=0,Pim=0.9,infectedT0=0,Pmr=0,Pmt=0,K=5000,dieexp=0.004,reprodrate=0.010) #Base with no infection
+params2<-makeparams(h2current=0,h2past=0,Pim=0.9,noflip=TRUE,K=5000,dieexp=0.004,reprodrate=0.010) #No Tolerance
+params3<-makeparams(h2current=0,h2past=0,Pim=0.9,K=5000,dieexp=0.004,reprodrate=0.010) #Tolerance but no inheritance
+params4<-makeparams(h2current=1,h2past=0.1,Pim=0.9,K=5000,dieexp=0.004,reprodrate=0.010) #Tolerance and inheritance
 allparams<-list(params1,params2,params3,params4)
 
 #Visualize the parasite parameters. A is Resist, B is Tolerate
@@ -43,15 +43,15 @@ allpops<-foreach(p=1:length(allparams)) %dopar% {
 }
 stopCluster(cl)
 #Optional save and load of models, so they don't need to be rerun each time
-save(allpops,file="allpops",compress=TRUE)
-load(file="allpops")
+#save(allpops,file="savedruns/allpopsImmunity",compress=TRUE)
+#load(file="savedruns/allpopsImmunity")
 
 #Plot figures
-pdf("figures/immunefig.pdf",width=7, height=4,pointsize=12)
-strategyreport(allpops[2:4],n=50*12,cols=cols,popmax=2000)
+pdf("figures/immunefigSup.pdf",width=7, height=4,pointsize=12)
+strategyreport(allpops[2:4],n=100*12,cols=cols,popmax=4500)
 dev.off()
 
-pdf("figures/survivalfig.pdf",width=3.43, height=5.2,pointsize=12)
+pdf("figures/survivalfigSup.pdf",width=3.43, height=5.2,pointsize=12)
 layout(matrix(c(1,2,3),ncol=1),heights=c(1,1,0.13))
 par(mar=c(1.75,4,0.75,1))
 survplot(allpops[1:4],n1=20*12+1,n2=120*12,cols=c("black",cols[3:5]),labs=c("No Infection","No Tolerance (A-B)","No Maternal Effect (C-D)","Maternal Effect (E-F)"))
@@ -60,8 +60,7 @@ mortalityplot(allpops[1:4],n1=20*12+1,n2=120*12,cols=c("black",cols[3:5]),labs=c
 mtext("B",side=3,line=-1,at=-20,cex=1.5)
 dev.off()
 
-
-pdf("figures/prevalenceSup.pdf",width=3.43, height=6.2,pointsize=12)
+pdf("figures/prevalenceSup2.pdf",width=3.43, height=6.2,pointsize=12)
 layout(matrix(c(1,2,3,4,5),ncol=1),heights=c(1,1,1,1,0.13))
 par(mar=c(1.75,4,0.75,1))
 prevplot(allpops[2:4],n1=0*12+1,n2=10*12,cols=cols[3:5],labs=c("No Tolerance (A-B)","No Maternal Effect (C-D)","Maternal Effect (E-F)"))
