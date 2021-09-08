@@ -1,7 +1,4 @@
 #Run for a flu-like model (Figure 5)
-library(doParallel)
-library(parallel)
-library(foreach)
 
 #Load functions first
 source("1 Model Functions.R")
@@ -12,10 +9,10 @@ cols<-c("black",wes_palette("Darjeeling1")[c(3,2,1,4,5)])
 
 ## ---- modelflu ----
 #set for flu. Medium cost immunity, same cost tolerance, high chance clearing, immunity
-paramsflu<-makeparams(months=120,h2current=1,h2past=0.1,PI=20,infectedT0=10,Pmr=0.10,Pmt=0.05,Pct=0,Pcr=0.8,Pim=0.90)
+paramsflu<-makeparams(months=120,h2current=1,h2past=0,PI=20,infectedT0=10,Pmr=0.10,Pmt=0.05,Pct=0,Pcr=0.8,Pim=0.90)
+
 
 #Visualize the parasite parameters. A is Resist, B is Tolerate
-paramscheck(params2,xmax1=10,xmax2=10)
 paramscheck(paramsflu,xmax1=2,xmax2=2)
 
 
@@ -23,7 +20,7 @@ set.seed(2367)
 popsflu<-runmodel(paramsflu)
 
 
-pdf("figures/flufig.pdf",width=3.43, height=1.7,pointsize=6)
+pdf("../inheritance-immunity paper/figures/flufig.pdf",width=3.43, height=1.7,pointsize=6)
 n<-12
 pops<-popsflu$pops[1:n]
 infections<-popsflu$infections

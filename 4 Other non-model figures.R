@@ -1,8 +1,8 @@
 
-#<<trade-offfig>>= (Fig 1)
-pdf("figures/trade-off fig.pdf",width=3.43, height=3.2,pointsize=10)
+#Trade-off Figure (Fig 1)
+pdf("../inheritance-immunity paper/figures/trade-offfig.pdf",width=3.43, height=2.7,pointsize=10)
 library(wesanderson)
-cols<-c("black",wes_palette("Darjeeling")[c(3,2,1,4,5)])
+cols<-c("black",wes_palette("Darjeeling1")[c(3,2,1,4,5)])
 par(mar=c(0,0,0,0))
 plot(0,0,type="n",ylim=c(0,0.9),xlim=c(0,1),bty="n",xaxt="n",yaxt="n")
 res<-1000
@@ -61,7 +61,6 @@ lines(c(tol1,tol2),c(y2-0.1,y2-0.1))
 text(0.5,y2-0.13,"Tolerance",font=2)
 
 dev.off()
-#@
 
 
 #Figure S1 showing profiles for three pathogen sets
@@ -69,7 +68,7 @@ paramsflu<-makeparams(months=120,h2current=1,h2past=0.1,PI=20,infectedT0=10,Pmr=
 params2<-makeparams(h2current=0,h2past=0,Pim=0.05,noflip=TRUE)
 params2H<-makeparams(h2current=0,h2past=0,Pim=0,noflip=TRUE,PI=0.1,Pmr=0.0005,Pmt=0.0001,Pcr=0.04,Pct=0.02,K=5000,dieexp=0.004,reprodrate=0.010)
 
-pdf("figures/parasiteprofiles.pdf",width=7, height=3.5,pointsize=12)
+pdf("../inheritance-immunity paper/figures/parasiteprofiles.pdf",width=7, height=3.5,pointsize=12)
 layout(matrix(c(8,9,0, 1,2,0, 3,4,7, 5,6,0, 10,11,0),nrow=3,byrow=FALSE),widths=c(0.75,4,4,4,2.5),heights=c(1,1,0.1))
 paramscheck(paramsflu,xmax1=4,xmax2=4,nolayout=TRUE,legend=NA)
 paramscheck(params2,xmax1=10,xmax2=10,nolayout=TRUE,legend=NA,letters=c("C","D"))
@@ -97,7 +96,7 @@ dev.off()
 
 #Figure 4 Model description
 library(wesanderson)
-pdf("figures/modeldiagram.pdf",width=3.43, height=2.2,pointsize=7)
+pdf("../inheritance-immunity paper/figures/modeldiagram.pdf",width=3.43, height=2.2,pointsize=7)
 cols<-c("lightgrey",wes_palette("Darjeeling1")[c(3,2,1,4,5)])
 
 par(mar=c(0,0,0,0))

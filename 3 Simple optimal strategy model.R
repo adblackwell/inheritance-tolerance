@@ -71,10 +71,10 @@ stopCluster(cl)
 library(wesanderson)
 colp<-colorRampPalette(c("white",wes_palette("Darjeeling1"))[c(3,1,5)])
 
-ratio<-matrix(log(compare1[1]/compare1),nrow=length(costs1),byrow=FALSE)
-ratio2<-matrix(log(compare2[1]/compare2),nrow=length(costs1),byrow=FALSE)
-ratio3<-matrix(log(compare3[1]/compare3),nrow=length(costs2),byrow=FALSE)
-ratio4<-matrix(log(compare4[1]/compare4),nrow=length(costs2),byrow=FALSE)
+ratio<-matrix(log(compare1[1]/compare1),nrow=length(costs),byrow=FALSE)
+ratio2<-matrix(log(compare2[1]/compare2),nrow=length(costs),byrow=FALSE)
+ratio3<-matrix(log(compare3[1]/compare3),nrow=length(costs),byrow=FALSE)
+ratio4<-matrix(log(compare4[1]/compare4),nrow=length(costs),byrow=FALSE)
 
 v<-round(max(abs(quantile(c(ratio,ratio2,ratio3,ratio4),c(0.05,0.95)))),1)
 ratio[ratio>v]<-v
@@ -88,7 +88,7 @@ ratio4[ratio4<(v*-1)]<-(v*-1)
 
 ratios<-list(ratio,ratio2,ratio3,ratio4)
 
-pdf("figures/tolerateorresist.pdf",width=3.43, height=2.75,pointsize=8)
+pdf("../inheritance-immunity paper/figures/tolerateorresist.pdf",width=3.43, height=2.5,pointsize=8)
 layout(matrix(c(0,0,0,6,7, 12,12,10,1,2,  12,12,10,8,9, 0,11,10,3,4, 0,0,0,5,5),ncol=5,byrow=TRUE),widths=c(0.5,0.5,0.15,1,1),heights=c(0.15,1.5,0.15,1.5,0.15))
 mars<-c(2,1.8,0.2,1)
 par(mar=mars)

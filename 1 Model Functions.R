@@ -19,12 +19,13 @@ makeparams<-function(n0=1000, #starting population size
                      Pcr=0.20, #Monthly probability of clearance when resisting
                      Pct=0.01, #Monthly probability of clearance when tolerating
                      Pim=0.2, #Probability of gaining immunity after clearance
+                     Pcrboost=1.5, #Scale factor for increase in clearance from previous brief exposure and clearance
+                     Pimboost=1.5, #Scale factor for increase in immunity chance from previous brief exposure and clearance
                      Ewdecline=0.98, #Proportion of immunological memory retained each month. when not infected, 'delta' in the paper
                      NIwdecline=1, #Proportion of uninfected time to retain each month. Effectively determines how far back 'memory' of not being infected goes.
                      inheritstrategy=FALSE, #whether offspring directly inherit mom's strategy (rather than just her history)
-                     flipthreshold=0.75, #proportion of posterior past this threshold determines prob of flipping, Tflip in the paper
+                     flipthreshold=0.5, #proportion of posterior past this threshold determines prob of flipping, Tflip in the paper
                      dieexp=0.002, #exponent for baseline non-infection mortality curve
-                     priorMon=0, #infants are born with an innate prior equal to this many months not infected
                      infectionweight=1, #how much infection months count relative to uninfected in updating prior
                      noflip=FALSE, #When TRUE, there is no strategy switching
                      trackinfections=TRUE){ #When true, infections are recorded, but makes the final dataset larger
@@ -38,9 +39,9 @@ makeparams<-function(n0=1000, #starting population size
 runmodel<-function(params,ageburn=2000,model=NA){
   with(params,{    
     #starting population
-    pop<-data.frame(age=abs(rnorm(n0,0,40)),strategy=startingstrategy,infected=0,immune=0,previousinfections=0,PIsum=0,Eweighted=0,NIweighted=0,dieinfect=0,dieage=0,die=0,reprod=0,RS=0,PI=0,RR=0)
+    pop<-data.frame(age=abs(rnorm(n0,0,40)),strategy=startingstrategy,infected=0,immune=0,previousinfections=0,PIsum=0,Eweighted=0,NIweighted=0,recentinf="000000000",dieinfect=0,dieage=0,die=0,reprod=0,RS=0,PI=0,RR=0)
     #baseline immune history for uninfected population
-    pop$NIweighted<-sapply(pop$age,function(x) sum(NIwdecline^(seq(1,x*12+priorMon))))
+    pop$NIweighted<-sapply(pop$age,function(x) sum(NIwdecline^(seq(1,x*12))))
     #burn in age structure
     for(i in 1:ageburn){
       pop$age<-pop$age+(1/12)
@@ -52,7 +53,7 @@ runmodel<-function(params,ageburn=2000,model=NA){
       pop$reprod[pop$reprod==0 & pop$age>=18 & pop$age<=45] <- rbinom(length(pop$reprod[pop$reprod==0 & pop$age>=18 & pop$age<=45]),1,reprodrate)
       pop$RS[pop$reprod==1]<-pop$RS[pop$reprod==1]+1
       if(sum(pop$reprod==1)>0){
-        babies<-data.frame(age=rep(0,sum(pop$reprod==1)),strategy=startingstrategy,infected=0,immune=0,previousinfections=0,PIsum=0,Eweighted=0,NIweighted=priorMon,dieinfect=0,dieage=0,die=0,reprod=0,RS=0,PI=0,RR=0)
+        babies<-data.frame(age=rep(0,sum(pop$reprod==1)),strategy=startingstrategy,infected=0,immune=0,previousinfections=0,PIsum=0,Eweighted=0,NIweighted=9,recentinf="000000000",dieinfect=0,dieage=0,die=0,reprod=0,RS=0,PI=0,RR=0)
         #baby gets mom's strategy perfectly for this start, just in case I mix them later and don't want proportion to change with reproduction
         babies$strategy<-pop$strategy[pop$reprod==1]
         pop<-rbind(pop,babies)
@@ -72,7 +73,7 @@ runmodel<-function(params,ageburn=2000,model=NA){
 
     #infect starting number
     pop$infected[sample(nrow(pop),infectedT0)]<-1
-    
+    pop$recentinf<-paste0(as.numeric(pop$infected>0),substr(pop$recentinf,2,9))
     pops<-list(pop)
     
     #track infections by adding to this whenever an infection ends
@@ -84,13 +85,13 @@ runmodel<-function(params,ageburn=2000,model=NA){
       #cumulative past history gets down-weighted each round, by same decline as loss of tolerance
       pop$NIweighted<-pop$NIweighted*NIwdecline
       pop$Eweighted<-pop$Eweighted*Ewdecline
-      pop$Eweighted[pop$Eweighted<(Ewdecline^2)]<-0
+      pop$Eweighted[pop$Eweighted<0.1]<-0
       
       #chance to lose tolerance/immunity (immunological memory) if not infected and Eweighted reaches zero
       pop$immune[pop$infected==0 & pop$Eweighted==0]<-0
       pop$strategy[pop$infected==0 & pop$Eweighted==0]<-1
       
-      #check for strategy switching, can only switch if infected (do this after infection so infants can switch right after infected)
+      #check for strategy switching, can only switch if infected
       # define grid
       p_grid <- seq( from=0 , to=1 , length.out=1000 )
       uniprior <- rep( 1 , 100 )
@@ -116,10 +117,15 @@ runmodel<-function(params,ageburn=2000,model=NA){
       pop$reprod[pop$reprod>gestation]<-0
       
       #fight infection
-      clearR<-rbinom(length(pop$infected[pop$infected>0]),1,Pcr)*(pop$strategy[pop$infected>0]==1)
+      #if newly infected and previously infected once for less than 2 months, 1 month clearance and immunity boost. Also boosts infants whose mothers were briefly infected.
+      PcrU<-Pcr^(1/(((pop$infected==1) & (pop$previousinfections<=1) & (pop$Eweighted>0) & (pop$Eweighted<=2))*(Pcrboost-1)+1))
+      clearR<-rbinom(length(pop$infected[pop$infected>0]),1,PcrU[pop$infected>0])*(pop$strategy[pop$infected>0]==1)
       clearT<-rbinom(length(pop$infected[pop$infected>0]),1,Pct)*(pop$strategy[pop$infected>0]==2)
-      #spontaneous clearance doesn't produce immunity and chance of immunity declines with each subsequent infection (assumes if you were going to develop immunity it would happen with the first or second infection...)
-      immune<-rbinom(length(clearR),1,Pim/(pop$previousinfections+1))*clearR
+      #spontaneous clearance doesn't produce immunity
+      #chance of immunity is higher on second exposure (or first if experience from mom), but then declines with each subsequent infection (assumes if you were going to develop immunity it would happen with the first or second infection...)
+      PimU<-Pim^(1/(((pop$infected==1) & (pop$previousinfections<=1) & (pop$Eweighted>0) & (pop$Eweighted<=2))*(Pimboost-1)+1))
+      PimU[pop$previousinfections>1]<-PimU[pop$previousinfections>1]/pop$previousinfections[pop$previousinfections>1]
+      immune<-rbinom(length(clearR),1,PimU[pop$infected>0])*clearR
       pop$immune[pop$infected>0]<-immune
       
       pop$previousinfections[pop$infected>0][(clearR==1 | clearT==1)]<- pop$previousinfections[pop$infected>0][(clearR==1 | clearT==1)] + 1
@@ -133,6 +139,7 @@ runmodel<-function(params,ageburn=2000,model=NA){
       
       #if still infected, mark infection duration for longer
       pop$infected[pop$infected>0] <- pop$infected[pop$infected>0]+1
+      
       #if not infected add to counter of uninfected time
       pop$NIweighted[pop$infected==0]<-pop$NIweighted[pop$infected==0]+1
 
@@ -166,18 +173,19 @@ runmodel<-function(params,ageburn=2000,model=NA){
         pop$infected[samp[infectable]]<-1
       }
       
+      #9 month history of infection for pregnancy purposes
+      pop$recentinf<-paste0(as.numeric(pop$infected>0),substr(pop$recentinf,1,8))
       
       #who will reproduce?
       pop$reprod[pop$reprod==0 & pop$age>=18 & pop$age<=45] <- rbinom(length(pop$reprod[pop$reprod==0 & pop$age>=18 & pop$age<=45]),1,reprodrate)
       pop$RS[pop$reprod==1]<-pop$RS[pop$reprod==1]+1
-      #baby has chance of getting mom's strategy if mom is infected
       if(sum(pop$reprod==1)>0){
-        babies<-data.frame(ID=paste0(pop$ID[pop$reprod==1],".",pop$RS[pop$reprod==1]),age=rep(0,sum(pop$reprod==1)),strategy=startingstrategy,infected=0,immune=0,previousinfections=0,PIsum=0,Eweighted=0,NIweighted=priorMon,dieinfect=0,dieage=0,die=0,reprod=0,RS=0,PI=0,RR=0)
+        babies<-data.frame(ID=paste0(pop$ID[pop$reprod==1],".",pop$RS[pop$reprod==1]),age=rep(0,sum(pop$reprod==1)),strategy=startingstrategy,infected=0,immune=0,previousinfections=0,PIsum=0,Eweighted=0,NIweighted=9^NIwdecline,recentinf="000000000",dieinfect=0,dieage=0,die=0,reprod=0,RS=0,PI=0,RR=0)
         
-        #baby gets immunity if mom is infected and resisting with Pim and history with weight h2current
-        babies$immune<-rbinom(length(babies$immune),1,Pim*h2current)*(pop$infected[pop$reprod==1]>0 & pop$strategy[pop$reprod==1]==1)
-        #babies get weighted current infection duration if mom is infected and also her past exposure if h2past>0, regardless of current infection
-        babies$Eweighted <- pop$infected[pop$reprod==1]*h2current+(pop$Eweighted[pop$reprod==1])*h2past
+        #babies get weighted current infection duration if mom is infected and also her past exposure if h2past>0, but can't exceed 9 months
+        #babies start with Eweighted equal to exposure during last 9 months * h2current, or if h2past>0 they can get a weighted total of their mother's experience.
+        babies$Eweighted <- max(unlist(lapply(strsplit(pop$recentinf[pop$reprod==1],""),function(x) sum(as.numeric(x))))*h2current, (pop$infected[pop$reprod==1]+(pop$Eweighted[pop$reprod==1]))*h2past)
+        babies$NIweighted <- max(babies$NIweighted-babies$Eweighted,0)
         #babies can start with mom's strategy if inheritstrategy=TRUE
         if(inheritstrategy) babies$strategy<-pop$strategy[pop$reprod==1]
         #babies get ID numbers
@@ -251,23 +259,27 @@ paramscheck<-function(params,xmax1=70,xmax2=70,nolayout=FALSE,legend="topright",
 strategyreport<-function(allpops,n=length(allpops[[1]]$pops),cols=c("black","blue","green","red","orange","purple"),popmax=NA){
   
   layout(rbind(matrix(seq(1,length(allpops)*2,1),ncol=length(allpops),byrow=FALSE),rep(0,length(allpops))),widths=rep(4,length(allpops)),heights=c(1,1,0.3))
-  bottommar<-1
-  ii<-1
+  bottommar <- 1
+  ii <- 1
+  i <- 0
   for(pops1 in allpops){
-    pops<-pops1$pops[1:n]
+    i <- i+1
+    if(length(n)>1) nu<-n[i] else nu<-n
+    pops<-pops1$pops[1:nu]
     #infections<-pops1$infections
     #params<-pops1$params
     
     par(mar=c(bottommar,4.5,1,1))
     infected<-Reduce(rbind,lapply(pops,function(x) c(sum(x$infected==0 & x$immune==0),sum(x$immune==1),sum(x$infected>0))))
     popsize<-infected[,1]+infected[,2]+infected[,3]
-    if(is.na(popmax)) popmax<-max(popsize)
-    plot(1,1,ylim=c(0,popmax),xlim=c(1,n),type="n",ylab="Individuals (x 1000)",xaxt="n",yaxt="n")
+    if(is.na(popmax[1])) popmax<-max(popsize)
+    if(length(popmax)>1) popm<-popmax[i] else popm<-popmax
+    plot(1,1,ylim=c(0,popm),xlim=c(1,nu),type="n",ylab="Individuals (x 1000)",xaxt="n",yaxt="n")
     lines(1:nrow(infected),popsize,lty=2,lwd=2,col=cols[1])
     lines(1:nrow(infected),infected[,1],lty=1,lwd=2,col=cols[2])
     lines(1:nrow(infected),infected[,2],lty=1,lwd=2,col=cols[3])
     lines(1:nrow(infected),infected[,3],lty=1,lwd=2,col=cols[4])
-    ax<-axTicks(1,axp=c(0,n/12,10))
+    ax<-axTicks(1,axp=c(0,nu/12,10))
     #ay<-axTicks(2,axp=c(0,max(popsize)/1000,5))
     axis(2,at=seq(0,10,0.5)*1000,labels=seq(0,10,0.5))
     axis(1,at=ax*12,labels=NA)
@@ -275,12 +287,12 @@ strategyreport<-function(allpops,n=length(allpops[[1]]$pops),cols=c("black","blu
     #par(mar=c(bottommar,0,0.2,1))
     #plot(1,1,xlim=c(0,1),ylim=c(0,1),bty="n",type="n",xaxt="n",yaxt="n",xlab=NA,ylab=NA)
     legend("topleft",c("All","Susceptible","Immune","Infected"),col=cols[1:4],lty=c(2,1,1,1),lwd=2,bty="o",box.col=NA,bg=rgb(1,1,1,0.5),inset=c(0.05,0.05),title=expression(bold("Status")))
-    mtext(LETTERS[ii],side=3,line=-1,at=-200,cex=1.5)
+    mtext(LETTERS[ii],side=3,line=-1,at=(nu/3) * -1,cex=1.5)
     ii<-ii+1
     
     par(mar=c(bottommar,4.5,1,1))
     strategy<-Reduce(rbind,lapply(pops,function(x) c(sum(x$strategy==1 & x$immune==0),sum(x$immune==1),sum(x$strategy==2 & x$immune==0))))
-    plot(1,1,ylim=c(0,1),xlim=c(1,n),type="n",ylab="Proportion",xaxt="n")
+    plot(1,1,ylim=c(0,1),xlim=c(1,nu),type="n",ylab="Proportion",xaxt="n")
     lines(1:nrow(strategy),strategy[,1]/popsize,lty=1,lwd=2,col=cols[1])
     lines(1:nrow(strategy),strategy[,2]/popsize,lty=1,lwd=2,col=cols[3])
     lines(1:nrow(strategy),strategy[,3]/popsize,lty=1,lwd=2,col=cols[5])
@@ -290,7 +302,7 @@ strategyreport<-function(allpops,n=length(allpops[[1]]$pops),cols=c("black","blu
     #par(mar=c(bottommar,0,0.2,1))
     #plot(1,1,xlim=c(0,1),ylim=c(0,1),bty="n",type="n",xaxt="n",yaxt="n",xlab=NA,ylab=NA)
     legend("right",c("Resist","Immune","Tolerate"),col=cols[c(1,3,5)],lty=1,lwd=2,bty="o",box.col=NA,bg=rgb(1,1,1,0.5),inset=c(0.05,0),title=expression(bold("Strategy")))
-    mtext(LETTERS[ii],side=3,line=-1,at=-200,cex=1.5)
+    mtext(LETTERS[ii],side=3,line=-1,at=(nu/3) * -1,cex=1.5)
     ii<-ii+1
   }
 }
@@ -311,13 +323,13 @@ survplot<-function(allpops,n1=1,n2=length(allpops[[1]]$pops),cols=rainbow(length
     ii<-ii+1
   }
   
-  plot(1,1,ylim=c(0,1),xlim=c(1,100),type="n",ylab="Survival (%)",xlab=NA,xaxt="n")
+  plot(1,1,ylim=c(0,1),xlim=c(0,100),type="n",ylab="Survival (%)",xlab=NA,xaxt="n")
   ii<-1
   for(s in sss){
     lines(s,conf.int=FALSE,col=cols[ii])
     ii<-ii+1
   }
-  axis(1,at=seq(1,100,10),labels=NA)
+  axis(1,at=seq(0,100,20),labels=NA)
   #mtext("Age",side=1,line=3)
   legend("topright",legend=labs,col=cols,lty=1,lwd=2,bty="o",box.col=NA,bg=rgb(1,1,1,0.5),inset=c(0.05,0.05),cex=1)
 }
@@ -340,7 +352,7 @@ mortalityplot<-function(allpops,n1=1,n2=length(allpops[[1]]$pops),cols=rainbow(l
     ii<-ii+1
   }
   
-  plot(1,1,ylim=c(0,20),xlim=c(1,100),type="n",ylab="Mortality (%)",xlab=NA)
+  plot(1,1,ylim=c(0,20),xlim=c(0,100),type="n",ylab="Mortality (%)",xlab=NA)
   ii<-1
   for(s in sss){
     group<-floor(s$time)
